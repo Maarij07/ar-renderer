@@ -35,6 +35,10 @@ export default function AR() {
       
       // Set up Three.js scene
       const canvas = canvasRef.current;
+      if (!canvas) {
+        throw new Error("Canvas element not found");
+      }
+      
       const scene = new THREE.Scene();
       
       // Set up camera
@@ -82,11 +86,18 @@ export default function AR() {
       // Load the GLTF model
       const loader = new GLTFLoader();
       loader.load('/result.gltf', (gltf) => {
+        console.log("Model loaded successfully", gltf);
         model = gltf.scene;
         model.scale.set(0.5, 0.5, 0.5); // Adjust scale as needed
         model.visible = false;
         scene.add(model);
-      }, undefined, (error) => {
+      }, 
+      // Progress callback
+      (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+      },
+      // Error callback
+      (error) => {
         console.error('Error loading model:', error);
         setErrorMessage('Error loading 3D model: ' + error.message);
       });

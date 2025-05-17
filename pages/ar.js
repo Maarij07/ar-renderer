@@ -54,12 +54,10 @@ export default function AR() {
             const renderer = new THREE.WebGLRenderer({
                 canvas,
                 alpha: true,
-                antialias: false, // Disable antialiasing for better performance
-                powerPreference: 'high-performance',
-                precision: 'lowp' // Use lower precision for better performance
+                antialias: true,
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Limit pixel ratio
+            renderer.setPixelRatio(window.devicePixelRatio);
             renderer.xr.enabled = true;
 
             // Add lighting

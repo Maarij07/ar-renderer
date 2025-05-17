@@ -91,12 +91,61 @@ export default function AR() {
       
       // Load the GLTF model
       const loader = new GLTFLoader();
-      loader.load('/models/result.gltf', (gltf) => {
-        console.log("Model loaded successfully", gltf);
-        model = gltf.scene;
-        model.scale.set(0.5, 0.5, 0.5); // Adjust scale as needed
-        model.visible = false;
-        scene.add(model);
+      
+      // Try loading with the correct path
+      const modelPath = '/models/result.gltf';
+      console.log('Attempting to load model from:', modelPath);
+      
+      loader.load(modelPath, 
+        // Success callback
+        (gltf) => {
+          console.log("Model loaded successfully", gltf);
+          model = gltf.scene;
+          
+          // Center the model
+          const box = new THREE.Box3().setFromObject(model);
+          const center = box.getCenter(new THREE.Vector3());
+          model.position.sub(center);
+          
+          // Adjust scale based on model size
+          const size = box.getSize(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const scale = 1.0 / maxDim;
+          model.scale.set(scale, scale, scale);
+          
+          model.visible = false;
+          scene.add(model);
+        }, 
+        // Progress callback
+        (xhr) => {
+          const percent = xhr.loaded / xhr.total * 100;
+          console.log(`${percent.toFixed(2)}% loaded`);
+        },
+        // Error callback
+        (error) => {
+          console.error('Error loading model:', error);
+          
+          // Try alternative path as fallback
+          console.log('Trying fallback path...');
+          loader.load('/result.gltf', 
+            (gltf) => {
+              console.log("Model loaded from fallback path", gltf);
+              model = gltf.scene;
+              model.scale.set(0.5, 0.5, 0.5);
+              model.visible = false;
+              scene.add(model);
+            },
+            undefined,
+            (fallbackError) => {
+              console.error('Fallback loading also failed:', fallbackError);
+              setErrorMessage(`Error loading 3D model: ${error.message}. Please check console for details.`);
+            }
+          );
+        }
+      );
+      model.scale.set(0.5, 0.5, 0.5); // Adjust scale as needed
+      model.visible = false;
+      scene.add(model);
       }, 
       // Progress callback
       (xhr) => {

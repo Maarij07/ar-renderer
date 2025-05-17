@@ -109,6 +109,9 @@ export default function AR() {
                     const maxDim = Math.max(size.x, size.y, size.z);
                     const scale = 1.0 / maxDim;
                     model.scale.set(scale, scale, scale);
+                    
+                    // Rotate the model by -90 degrees around the X-axis
+                    model.rotation.x = THREE.MathUtils.degToRad(-90);
 
                     model.visible = false;
                     scene.add(model);

@@ -105,7 +105,7 @@ export default function AR() {
                     model.position.sub(center);
 
                     // Scale the model by 50x instead of automatic scaling
-                    model.scale.set(50, 50, 50);
+                    model.scale.set(20, 20, 20);
                     
                     // Rotate the model by -90 degrees around the X-axis
                     model.rotation.x = THREE.MathUtils.degToRad(-90);

@@ -28,6 +28,12 @@ export default function AR() {
     if (!arSupported) return;
     
     try {
+      // Set arStarted to true first to render the canvas
+      setArStarted(true);
+      
+      // Add a small delay to ensure the canvas is rendered
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Import Three.js and related modules dynamically to avoid SSR issues
       const THREE = await import('three');
       const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader');
@@ -85,7 +91,7 @@ export default function AR() {
       
       // Load the GLTF model
       const loader = new GLTFLoader();
-      loader.load('/result.gltf', (gltf) => {
+      loader.load('/models/result.gltf', (gltf) => {
         console.log("Model loaded successfully", gltf);
         model = gltf.scene;
         model.scale.set(0.5, 0.5, 0.5); // Adjust scale as needed
@@ -230,10 +236,14 @@ export default function AR() {
           </div>
         ) : (
           <>
-            <canvas ref={canvasRef} className={styles.canvas} />
-            <div className={styles.instructions}>
-              Tap on a surface to place the model
-            </div>
+            <canvas ref={canvasRef} className={styles.canvas} id="ar-canvas"></canvas>
+            {errorMessage ? (
+              <p className={styles.errorMessage}>{errorMessage}</p>
+            ) : (
+              <div className={styles.instructions}>
+                Tap on a surface to place the model
+              </div>
+            )}
           </>
         )}
       </main>

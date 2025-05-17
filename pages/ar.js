@@ -55,18 +55,24 @@ export default function AR() {
                 canvas,
                 alpha: true,
                 antialias: true,
+                preserveDrawingBuffer: true
             });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.outputEncoding = THREE.sRGBEncoding; // Important for color accuracy
             renderer.xr.enabled = true;
 
             // Add lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Increased intensity
             scene.add(ambientLight);
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // Increased intensity
             directionalLight.position.set(0, 10, 0);
             scene.add(directionalLight);
+
+            // Add additional lights for better color rendering
+            const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x404040, 1.0);
+            scene.add(hemisphereLight);
 
             // Create AR button and append to document
             const arButton = ARButton.createButton(renderer, {
@@ -104,11 +110,36 @@ export default function AR() {
                     const center = box.getCenter(new THREE.Vector3());
                     model.position.sub(center);
 
-                    // Scale the model by 50x instead of automatic scaling
-                    model.scale.set(0.3,0.3,0.3);
+                    // Scale the model
+                    model.scale.set(0.3, 0.3, 0.3);
                     
                     // Rotate the model by -90 degrees around the X-axis
                     model.rotation.x = THREE.MathUtils.degToRad(-90);
+
+                    // Ensure materials are properly set up for color display
+                    model.traverse((node) => {
+                        if (node.isMesh) {
+                            // Make sure materials use proper color rendering
+                            if (node.material) {
+                                // Enable color information
+                                node.material.needsUpdate = true;
+                                
+                                // Ensure proper material settings for color
+                                if (node.material.map) {
+                                    node.material.map.encoding = THREE.sRGBEncoding;
+                                }
+                                
+                                // Increase material color saturation if needed
+                                if (node.material.color) {
+                                    const color = node.material.color;
+                                    // Boost saturation slightly
+                                    const hsl = {};
+                                    color.getHSL(hsl);
+                                    color.setHSL(hsl.h, Math.min(hsl.s * 1.2, 1.0), hsl.l);
+                                }
+                            }
+                        }
+                    });
 
                     model.visible = false;
                     scene.add(model);

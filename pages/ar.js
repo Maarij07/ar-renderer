@@ -104,8 +104,11 @@ export default function AR() {
                     const center = box.getCenter(new THREE.Vector3());
                     model.position.sub(center);
 
-                    // Scale the model by 50x instead of automatic scaling
-                    model.scale.set(2, 2, 2);
+                    // Adjust scale based on model size
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 1.0 / maxDim;
+                    model.scale.set(scale, scale, scale);
                     
                     // Rotate the model by -90 degrees around the X-axis
                     model.rotation.x = THREE.MathUtils.degToRad(-90);

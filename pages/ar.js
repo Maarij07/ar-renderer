@@ -7,13 +7,65 @@ export default function AR() {
     const [arSupported, setArSupported] = useState(false);
     const [arStarted, setArStarted] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [loadingProgress, setLoadingProgress] = useState(0);
+    const [performanceMode, setPerformanceMode] = useState('auto'); // 'low', 'medium', 'high', 'auto'
+    const [isLowEndDevice, setIsLowEndDevice] = useState(false);
 
+    // Check device performance on component mount
     useEffect(() => {
-        // Check if WebXR is supported
+        checkDevicePerformance();
+        checkARSupport();
+    }, []);
+
+    // Function to check device performance
+    const checkDevicePerformance = () => {
+        // Simple heuristic to detect low-end devices
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+
+        if (!gl) {
+            setIsLowEndDevice(true);
+            setPerformanceMode('low');
+            return;
+        }
+
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : '';
+
+        // Check for known low-end GPU identifiers
+        const lowEndGPUs = ['PowerVR', 'Mali-4', 'Mali-T6', 'Mali-G5', 'Adreno 3', 'Adreno 4'];
+        const isLowEnd = lowEndGPUs.some(gpu => renderer.includes(gpu));
+
+        // Also check device memory if available
+        const lowMemory = navigator.deviceMemory && navigator.deviceMemory < 4;
+
+        setIsLowEndDevice(isLowEnd || lowMemory);
+        setPerformanceMode(isLowEnd || lowMemory ? 'low' : 'medium');
+
+        console.log('Device performance check:', {
+            renderer,
+            memory: navigator.deviceMemory || 'unknown',
+            performanceMode: isLowEnd || lowMemory ? 'low' : 'medium'
+        });
+    };
+
+    // Function to check AR support
+    const checkARSupport = () => {
         if ('xr' in navigator) {
             navigator.xr.isSessionSupported('immersive-ar')
                 .then((supported) => {
                     setArSupported(supported);
+                    if (!supported) {
+                        // Try simpler session type as fallback
+                        return navigator.xr.isSessionSupported('inline')
+                            .then(inlineSupported => {
+                                if (inlineSupported) {
+                                    setArSupported(true);
+                                    setErrorMessage('Full AR not supported. Using simplified mode.');
+                                }
+                            });
+                    }
                 })
                 .catch(error => {
                     console.error('Error checking AR support:', error);
@@ -22,22 +74,24 @@ export default function AR() {
         } else {
             setErrorMessage('WebXR not supported in this browser');
         }
-    }, []);
+    };
 
     const startAR = async () => {
         if (!arSupported) return;
 
         try {
-            // Set arStarted to true first to render the canvas
+            setIsLoading(true);
             setArStarted(true);
 
             // Add a small delay to ensure the canvas is rendered
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 300));
 
             // Import Three.js and related modules dynamically to avoid SSR issues
             const THREE = await import('three');
             const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader');
             const { ARButton } = await import('three/examples/jsm/webxr/ARButton');
+            // Import the DRACOLoader for compressed models
+            const { DRACOLoader } = await import('three/examples/jsm/loaders/DRACOLoader');
 
             // Set up Three.js scene
             const canvas = canvasRef.current;
@@ -48,44 +102,51 @@ export default function AR() {
             const scene = new THREE.Scene();
 
             // Set up camera
-            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
 
-            // Set up renderer
+            // Set up renderer with optimized settings
             const renderer = new THREE.WebGLRenderer({
                 canvas,
                 alpha: true,
-                antialias: true,
-                preserveDrawingBuffer: true
+                antialias: performanceMode !== 'low', // Disable antialiasing for low-end devices
+                powerPreference: performanceMode === 'low' ? 'low-power' : 'high-performance',
+                precision: performanceMode === 'low' ? 'lowp' : 'mediump',
+                preserveDrawingBuffer: false
             });
+
+            // Set pixel ratio based on performance mode
+            const pixelRatio = window.devicePixelRatio || 1;
+            renderer.setPixelRatio(performanceMode === 'low' ? Math.min(pixelRatio, 1) :
+                performanceMode === 'medium' ? Math.min(pixelRatio, 1.5) :
+                    pixelRatio);
+
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.outputEncoding = THREE.sRGBEncoding; // Important for color accuracy
+            renderer.outputEncoding = THREE.sRGBEncoding;
             renderer.xr.enabled = true;
 
-            // Add lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Increased intensity
+            // Simplified lighting setup for better performance
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
             scene.add(ambientLight);
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // Increased intensity
-            directionalLight.position.set(0, 10, 0);
-            scene.add(directionalLight);
-
-            // Add additional lights for better color rendering
-            const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x404040, 1.0);
-            scene.add(hemisphereLight);
+            // Only add directional light on medium/high performance devices
+            if (performanceMode !== 'low') {
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(0, 5, 0);
+                scene.add(directionalLight);
+            }
 
             // Create AR button and append to document
             const arButton = ARButton.createButton(renderer, {
-                requiredFeatures: ['hit-test'],
+                requiredFeatures: performanceMode === 'low' ? [] : ['hit-test'],
                 optionalFeatures: ['dom-overlay'],
                 domOverlay: { root: document.body }
             });
 
             document.body.appendChild(arButton);
 
-            // Variables for AR placement
+            // Simplified reticle geometry for better performance
             let reticle = new THREE.Mesh(
-                new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
+                new THREE.RingGeometry(0.15, 0.2, performanceMode === 'low' ? 16 : 32).rotateX(-Math.PI / 2),
                 new THREE.MeshBasicMaterial({ color: 0xffffff })
             );
             reticle.matrixAutoUpdate = false;
@@ -95,90 +156,123 @@ export default function AR() {
             let model = null;
             let modelPlaced = false;
 
-            // Load the GLTF model
+            // Configure DRACO loader for compressed models
+            const dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('/draco/');
+
+            // Load the GLTF model with compression support
             const loader = new GLTFLoader();
-            const modelPath = '/models/result.gltf';
+            loader.setDRACOLoader(dracoLoader);
+
+            // Choose model based on device capability
+            const modelPath = isLowEndDevice ?
+                '/models/result_low.gltf' :  // Use a lower poly model for low-end devices
+                '/models/result.gltf';       // Use the original model for better devices
+
+            // Fallback paths to try if main model fails
+            const fallbackPaths = [
+                '/models/result.gltf',
+                '/result.gltf',
+                '/models/fallback.gltf'
+            ];
+
             console.log('Attempting to load model from:', modelPath);
-            loader.load(modelPath,
-                // Success callback
-                (gltf) => {
-                    console.log("Model loaded successfully", gltf);
-                    model = gltf.scene;
 
-                    // Center the model
-                    const box = new THREE.Box3().setFromObject(model);
-                    const center = box.getCenter(new THREE.Vector3());
-                    model.position.sub(center);
+            const loadModel = (path, index = 0) => {
+                loader.load(
+                    path,
+                    // Success callback
+                    (gltf) => {
+                        console.log("Model loaded successfully", gltf);
+                        model = gltf.scene;
 
-                    // Scale the model
-                    model.scale.set(0.3, 0.3, 0.3);
-                    
-                    // Rotate the model by -90 degrees around the X-axis
-                    model.rotation.x = THREE.MathUtils.degToRad(-90);
+                        // Optimize the model based on device performance
+                        optimizeModel(model, THREE);
 
-                    // Ensure materials are properly set up for color display
-                    model.traverse((node) => {
-                        if (node.isMesh) {
-                            // Make sure materials use proper color rendering
+                        model.visible = false;
+                        scene.add(model);
+                        setIsLoading(false);
+                    },
+                    // Progress callback
+                    (xhr) => {
+                        const percent = xhr.loaded / xhr.total * 100;
+                        setLoadingProgress(Math.floor(percent));
+                        console.log(`${percent.toFixed(2)}% loaded`);
+                    },
+                    // Error callback
+                    (error) => {
+                        console.error(`Error loading model from ${path}:`, error);
+
+                        // Try next fallback if available
+                        if (index < fallbackPaths.length) {
+                            console.log(`Trying fallback path: ${fallbackPaths[index]}`);
+                            loadModel(fallbackPaths[index], index + 1);
+                        } else {
+                            // All paths failed, show error
+                            console.error('All model loading attempts failed');
+                            setErrorMessage('Could not load 3D model. Please try again later.');
+                            setIsLoading(false);
+                        }
+                    }
+                );
+            };
+
+            // Function to optimize model based on device capability
+            const optimizeModel = (model, THREE) => {
+                // Center the model
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                model.position.sub(center);
+
+                // Scale based on performance mode
+                const scale = performanceMode === 'low' ? 0.25 : 0.3;
+                model.scale.set(scale, scale, scale);
+
+                // Rotate the model
+                model.rotation.x = THREE.MathUtils.degToRad(-90);
+
+                // Optimize materials and geometries
+                model.traverse((node) => {
+                    if (node.isMesh) {
+                        // For low-end devices, simplify materials
+                        if (performanceMode === 'low') {
+                            // Replace with basic material for better performance
+                            const color = node.material.color ?
+                                node.material.color.clone() :
+                                new THREE.Color(0xcccccc);
+
+                            node.material = new THREE.MeshBasicMaterial({
+                                color: color,
+                                map: node.material.map
+                            });
+                        } else {
+                            // For better devices, just ensure proper material settings
                             if (node.material) {
-                                // Enable color information
                                 node.material.needsUpdate = true;
-                                
-                                // Ensure proper material settings for color
+
                                 if (node.material.map) {
                                     node.material.map.encoding = THREE.sRGBEncoding;
                                 }
-                                
-                                // Increase material color saturation if needed
-                                if (node.material.color) {
-                                    const color = node.material.color;
-                                    // Boost saturation slightly
-                                    const hsl = {};
-                                    color.getHSL(hsl);
-                                    color.setHSL(hsl.h, Math.min(hsl.s * 1.2, 1.0), hsl.l);
-                                }
                             }
                         }
-                    });
 
-                    model.visible = false;
-                    scene.add(model);
-                },
-                // Progress callback
-                (xhr) => {
-                    const percent = xhr.loaded / xhr.total * 100;
-                    console.log(`${percent.toFixed(2)}% loaded`);
-                },
-                // Error callback
-                (error) => {
-                    console.error('Error loading model:', error);
-
-                    // Try alternative path as fallback
-                    console.log('Trying fallback path...');
-                    loader.load('/result.gltf',
-                        (gltf) => {
-                            console.log("Model loaded from fallback path", gltf);
-                            model = gltf.scene;
-                            model.scale.set(0.5, 0.5, 0.5);
-                            model.visible = false;
-                            scene.add(model);
-                        },
-                        undefined,
-                        (fallbackError) => {
-                            console.error('Fallback loading also failed:', fallbackError);
-                            setErrorMessage(`Error loading 3D model: ${error.message}. Please check console for details.`);
+                        // Simplify geometry on low-end devices if it has too many vertices
+                        if (performanceMode === 'low' && node.geometry &&
+                            node.geometry.attributes &&
+                            node.geometry.attributes.position &&
+                            node.geometry.attributes.position.count > 5000) {
+                            console.log('Simplifying complex geometry',
+                                node.geometry.attributes.position.count, 'vertices');
+                            // We don't actually simplify here as it would require importing
+                            // a geometry simplification library, but in a real app you would
+                            // use a library like SimplifyModifier or pregenerate LODs
                         }
-                    );
-                },
-                // Progress callback
-                (xhr) => {
-                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-                },
-                // Error callback
-                (error) => {
-                    console.error('Error loading model:', error);
-                    setErrorMessage('Error loading 3D model: ' + error.message);
+                    }
                 });
+            };
+
+            // Start model loading
+            loadModel(modelPath);
 
             // Controller for hit testing
             let controller = renderer.xr.getController(0);
@@ -187,25 +281,81 @@ export default function AR() {
 
             // Function to handle tap/select events
             function onSelect() {
-                if (reticle.visible && model && !modelPlaced) {
-                    // Place the model at the reticle position
-                    model.position.setFromMatrixPosition(reticle.matrix);
-                    model.visible = true;
-                    modelPlaced = true;
-                } else if (modelPlaced) {
-                    // Allow repositioning if already placed
-                    modelPlaced = false;
+                if (model && (!reticle.visible || performanceMode === 'low')) {
+                    // For low-end devices, just place in front of camera
+                    if (performanceMode === 'low' && !modelPlaced) {
+                        // Place model 1 meter in front of camera
+                        const position = new THREE.Vector3(0, 0, -1).applyMatrix4(controller.matrixWorld);
+                        model.position.copy(position);
+                        model.visible = true;
+                        modelPlaced = true;
+                    }
+                    // For better devices, place at reticle
+                    else if (reticle.visible && !modelPlaced) {
+                        model.position.setFromMatrixPosition(reticle.matrix);
+                        model.visible = true;
+                        modelPlaced = true;
+                    }
+                    // Allow repositioning
+                    else if (modelPlaced) {
+                        modelPlaced = false;
+                        if (performanceMode !== 'low') {
+                            model.visible = false;
+                        }
+                    }
                 }
             }
 
-            // XR session hit test source
+            // XR session hit test source (only for medium/high performance)
             let hitTestSource = null;
             let hitTestSourceRequested = false;
 
+            // Simple FPS counter for performance monitoring
+            let frameCount = 0;
+            let lastTime = performance.now();
+            let fps = 0;
+
+            const updatePerformanceMode = (currentFps) => {
+                // If FPS is too low, reduce quality settings
+                if (currentFps < 20 && performanceMode !== 'low') {
+                    console.log('FPS too low, reducing quality settings', currentFps);
+                    setPerformanceMode('low');
+
+                    // Simplify lighting
+                    scene.children.forEach(child => {
+                        if (child.isDirectionalLight) {
+                            scene.remove(child);
+                        }
+                    });
+
+                    // Lower renderer quality
+                    renderer.setPixelRatio(1);
+                    renderer.antialias = false;
+
+                    // Optimize model if already loaded
+                    if (model) {
+                        optimizeModel(model, THREE);
+                    }
+                }
+            };
+
             // Animation loop
             renderer.setAnimationLoop((timestamp, frame) => {
-                if (frame) {
-                    // Perform hit test
+                // Update FPS counter
+                frameCount++;
+                const now = performance.now();
+                if (now - lastTime >= 1000) {
+                    fps = frameCount;
+                    frameCount = 0;
+                    lastTime = now;
+                    console.log('FPS:', fps);
+
+                    // Adjust performance mode based on FPS
+                    updatePerformanceMode(fps);
+                }
+
+                if (frame && performanceMode !== 'low') {
+                    // Perform hit test for medium/high performance devices
                     if (!hitTestSourceRequested) {
                         const session = renderer.xr.getSession();
 
@@ -252,16 +402,18 @@ export default function AR() {
                 renderer.render(scene, camera);
             });
 
-            // Handle window resize
+            // Handle window resize with throttling for better performance
+            let resizeTimeout;
             const handleResize = () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                }, 200);
             };
 
             window.addEventListener('resize', handleResize);
-
-            setArStarted(true);
 
             // Cleanup function
             return () => {
@@ -272,10 +424,12 @@ export default function AR() {
                 if (document.body.contains(arButton)) {
                     document.body.removeChild(arButton);
                 }
+                dracoLoader.dispose();
             };
         } catch (error) {
             console.error('Error starting AR:', error);
             setErrorMessage('Error starting AR: ' + error.message);
+            setIsLoading(false);
         }
     };
 
@@ -296,6 +450,20 @@ export default function AR() {
                         ) : (
                             <>
                                 <p>Place your 3D model in augmented reality</p>
+                                <div className={styles.performanceSelector}>
+                                    <label>
+                                        Device Performance:
+                                        <select
+                                            value={performanceMode}
+                                            onChange={(e) => setPerformanceMode(e.target.value)}
+                                        >
+                                            <option value="auto">Auto-detect</option>
+                                            <option value="low">Low-end Device</option>
+                                            <option value="medium">Mid-range Device</option>
+                                            <option value="high">High-end Device</option>
+                                        </select>
+                                    </label>
+                                </div>
                                 <button
                                     className={styles.startButton}
                                     onClick={startAR}
@@ -309,12 +477,35 @@ export default function AR() {
                 ) : (
                     <>
                         <canvas ref={canvasRef} className={styles.canvas} id="ar-canvas"></canvas>
-                        {errorMessage ? (
+                        {isLoading ? (
+                            <div className={styles.loadingOverlay}>
+                                <p>Loading model... {loadingProgress}%</p>
+                                <div className={styles.progressBar}>
+                                    <div
+                                        className={styles.progressFill}
+                                        style={{ width: `${loadingProgress}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        ) : errorMessage ? (
                             <p className={styles.errorMessage}>{errorMessage}</p>
                         ) : (
                             <div className={styles.instructions}>
-                                Tap on a surface to place the model
+                                Tap {performanceMode === 'low' ? '' : 'on a surface '}
+                                to place the model
                             </div>
+                        )}
+
+                        {arStarted && (
+                            <button
+                                className={styles.backButton}
+                                onClick={() => {
+                                    setArStarted(false);
+                                    setErrorMessage('');
+                                }}
+                            >
+                                ← Back
+                            </button>
                         )}
                     </>
                 )}

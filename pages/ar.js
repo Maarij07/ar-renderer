@@ -165,15 +165,14 @@ export default function AR() {
             loader.setDRACOLoader(dracoLoader);
 
             // Choose model based on device capability
-            const modelPath = isLowEndDevice ?
-                '/models/result_low.gltf' :  // Use a lower poly model for low-end devices
-                '/models/result.gltf';       // Use the original model for better devices
+            // For now, use the same model for all devices until low-poly version is available
+            const modelPath = '/models/House Project.gltf';
 
             // Fallback paths to try if main model fails
             const fallbackPaths = [
-                '/models/result.gltf',
-                '/result.gltf',
-                '/models/fallback.gltf'
+                '/models/result.gltf',  // Legacy fallback
+                '/House Project.gltf',  // Root directory fallback
+                '/models/fallback.gltf' // Generic fallback
             ];
 
             console.log('Attempting to load model from:', modelPath);
@@ -436,20 +435,20 @@ export default function AR() {
     return (
         <div className={styles.container}>
             <Head>
-                <title>AR Experience</title>
-                <meta name="description" content="AR Experience with Next.js and Three.js" />
+                <title>House Project AR - AR Experience</title>
+                <meta name="description" content="View your house project in augmented reality with Next.js and Three.js" />
                 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
             </Head>
 
             <main className={styles.main}>
                 {!arStarted ? (
                     <div>
-                        <h1>AR Model Viewer</h1>
+                        <h1>House Project AR Viewer</h1>
                         {errorMessage ? (
                             <p className={styles.errorMessage}>{errorMessage}</p>
                         ) : (
                             <>
-                                <p>Place your 3D model in augmented reality</p>
+                                <p>Place your house project in augmented reality</p>
                                 <div className={styles.performanceSelector}>
                                     <label>
                                         Device Performance:

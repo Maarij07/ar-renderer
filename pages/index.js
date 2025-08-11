@@ -6,14 +6,13 @@ export default function Home() {
   return (
     <div className={styles.container}>
       <Head>
-        <title>AR Renderer</title>
-        <meta name="description" content="AR Renderer with Next.js and Three.js" />
+        <title>House Project AR</title>
+        <meta name="description" content="House Project AR - View your 3D house model in augmented reality" />
         <link rel="icon" href="/favicon.ico" />
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
 
       <header className={styles.header}>
-        <div className={styles.logo}>AR Renderer</div>
+        <div className={styles.logo}>House Project AR</div>
         <nav className={styles.nav}>
           <Link href="/" className={styles.navLink}>Home</Link>
           <Link href="/ar" className={styles.navLink}>AR Experience</Link>
@@ -24,11 +23,11 @@ export default function Home() {
       <main className={styles.main}>
         <div className={styles.hero}>
           <h1 className={styles.title}>
-            Experience 3D Models in <span className={styles.highlight}>Augmented Reality</span>
+            View Your House Project in <span className={styles.highlight}>Augmented Reality</span>
           </h1>
 
           <p className={styles.description}>
-            Place virtual objects in your real-world environment with our WebXR-powered AR viewer.
+            Visualize your 3D house model in your real-world environment with our WebXR-powered AR viewer.
             No app installation required - works directly in your browser!
           </p>
 
@@ -65,7 +64,7 @@ export default function Home() {
           Built with Next.js, Three.js and WebXR
         </p>
         <p className={styles.copyright}>
-          © 2023 AR Renderer. All rights reserved.
+          © 2024 House Project AR. All rights reserved.
         </p>
       </footer>
     </div>

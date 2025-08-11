@@ -1,3 +1,21 @@
+# House Project AR
+
+This is a WebXR-powered AR application built with Next.js that allows you to visualize 3D house models in augmented reality. View your house project directly in your real-world environment using your mobile device's camera.
+
+## Features
+
+- **Augmented Reality Viewing**: Place 3D house models in your real environment
+- **Performance Optimization**: Automatic device performance detection with quality adjustments
+- **Mobile-First Design**: Optimized for mobile devices with WebXR support
+- **Surface Detection**: Advanced surface detection for realistic model placement
+- **Responsive Design**: Works across different screen sizes and orientations
+
+## Supported Devices
+
+- Android devices with Chrome browser
+- Devices supporting WebXR immersive-ar sessions
+- ARCore-compatible Android devices for best experience
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
 
 ## Getting Started
